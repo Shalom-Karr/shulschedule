@@ -3,24 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Full Screen Iframe</title>
+    <title>Full Screen Image Viewer</title>
     <style>
-        body, html {
+        /* Basic reset to make it full screen */
+        html, body {
             margin: 0;
             padding: 0;
             height: 100%;
             width: 100%;
-            overflow: hidden; /* Hide scrollbars */
+            overflow: hidden; /* Prevents scrollbars on the main page */
+            background-color: #1a1a1a; /* Dark background */
+            font-family: sans-serif;
         }
-        iframe {
-            border: none; /* Remove the default iframe border */
-            width: 100%;
-            height: 100%;
+
+        /* The container that will hold our image */
+        #image-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* The image itself, using the correct 'img' tag */
+        #zoomable-image {
+            max-width: 100%;
+            max-height: 100%;
+            cursor: grab;
+        }
+
+        #zoomable-image:active {
+            cursor: grabbing;
+        }
+        
+        /* Simple instructions overlay */
+        .instructions {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            pointer-events: none;
         }
     </style>
 </head>
 <body>
-    <!-- This iframe now fills the entire page -->
-    <iframe src="https://drive.google.com/file/d/1GgM81MuzsCFAnraxLD66tNDXPsuiJ1Ev/preview"></iframe>
+
+    <div id="image-container">
+        <!-- We use the IMG tag with the special 'uc' URL to embed the raw image -->
+        <img id="zoomable-image" src="https://drive.google.com/uc?export=view&id=1GgM81MuzsCFAnraxLD66tNDXPsuiJ1Ev" alt="Zoomable Image">
+    </div>
+    
+    <div class="instructions">
+        Use mouse wheel or pinch to zoom. Drag to pan.
+    </div>
+
+    <!-- Panzoom library for robust zoom/pan functionality -->
+    <script src="https://unpkg.com/@panzoom/panzoom/dist/panzoom.min.js"></script>
+
+    <script>
+        const imageContainer = document.getElementById('image-container');
+        const imageElement = document.getElementById('zoomable-image');
+
+        const panzoom = Panzoom(imageElement, {
+            maxScale: 10,
+            minScale: 0.5
+        });
+
+        // Enable zooming with the mouse wheel
+        imageContainer.addEventListener('wheel', panzoom.zoomWithWheel);
+        
+        // Handle image loading errors (e.g., permission issues on Google Drive)
+        imageElement.addEventListener('error', function() {
+            alert('Failed to load image. Make sure the Google Drive link is shared with "Anyone with the link".');
+            imageElement.style.display = 'none';
+        });
+    </script>
+
 </body>
 </html>
