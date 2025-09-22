@@ -1,147 +1,181 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Full Screen Image Viewer with Controls</title>
-    <style>
-        /* Basic reset to make it full screen */
+    <title>Image Viewer for Older Browsers</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <style type="text/css">
+        /* Basic styles for full page layout */
         html, body {
-            margin: 0;
-            padding: 0;
             height: 100%;
             width: 100%;
-            overflow: hidden;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Hide scrollbars */
             background-color: #1a1a1a;
-            font-family: sans-serif;
         }
 
-        /* The container that will hold our image */
-        #image-container {
-            width: 100vw;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+        /* The main container */
+        #imageContainer {
+            position: relative; /* This is the anchor for the image */
+            width: 100%;
+            height: 100%;
         }
 
-        /* The image itself */
-        #zoomable-image {
-            max-width: 100%;
-            max-height: 100%;
-            cursor: grab;
-        }
-        #zoomable-image:active {
-            cursor: grabbing;
-        }
-        
-        /* NEW: Styling for the control buttons */
-        .controls {
+        /* The image itself. Its size and position will be controlled by JavaScript. */
+        #zoomableImage {
             position: absolute;
-            top: 15px;
-            right: 15px;
-            display: flex;
-            gap: 10px; /* Space between buttons */
-            z-index: 10; /* Ensure buttons are on top */
+            cursor: move; /* 'move' cursor is supported by all old browsers */
+        }
+        
+        /* The control buttons */
+        #controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 100;
         }
 
-        .controls button {
-            background-color: rgba(0, 0, 0, 0.6);
-            color: white;
-            border: none;
-            border-radius: 5px;
-            width: 40px;
-            height: 40px;
-            font-size: 24px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        
-        .controls button:hover {
-            background-color: rgba(0, 0, 0, 0.8);
-        }
-        
-        /* Specific style for the fullscreen button to fit text */
-        #fullscreen-btn {
-            width: auto;
-            padding: 0 15px;
-            font-size: 16px;
+        #controls button {
+            width: 80px;
+            padding: 5px;
+            font-size: 14px;
+            margin-left: 5px;
         }
     </style>
 </head>
+
 <body>
 
-    <div id="image-container">
-        <img id="zoomable-image" src="https://drive.google.com/uc?export=view&id=1GgM81MuzsCFAnraxLD66tNDXPsuiJ1Ev" alt="Zoomable Image">
+    <div id="imageContainer">
+        <!-- The image from Google Drive -->
+        <img id="zoomableImage" src="https://drive.google.com/uc?export=view&id=1GgM81MuzsCFAnraxLD66tNDXPsuiJ1Ev" alt="Loading image...">
     </div>
     
-    <!-- NEW: HTML for the buttons -->
-    <div class="controls">
-        <button id="zoom-in-btn">+</button>
-        <button id="zoom-out-btn">-</button>
-        <button id="fullscreen-btn">Fullscreen</button>
+    <!-- Buttons for controls -->
+    <div id="controls">
+        <button onclick="zoom(1.25);">+</button>
+        <button onclick="zoom(0.8);">-</button>
+        <button onclick="resetImage();">Reset</button>
+        <button onclick="alert('To enter or exit full screen, press the F11 key on your keyboard.');">Fullscreen</button>
     </div>
 
-    <!-- Panzoom library for robust zoom/pan functionality -->
-    <script src="https://unpkg.com/@panzoom/panzoom/dist/panzoom.min.js"></script>
+    <script type="text/javascript">
+        // Get references to our elements
+        var img = document.getElementById('zoomableImage');
+        var container = document.getElementById('imageContainer');
 
-    <script>
-        // Get elements from the page
-        const imageContainer = document.getElementById('image-container');
-        const imageElement = document.getElementById('zoomable-image');
-        const zoomInBtn = document.getElementById('zoom-in-btn');
-        const zoomOutBtn = document.getElementById('zoom-out-btn');
-        const fullscreenBtn = document.getElementById('fullscreen-btn');
-
-        // Initialize Panzoom
-        const panzoom = Panzoom(imageElement, {
-            maxScale: 10,
-            minScale: 0.5
-        });
-
-        // Still allow mouse wheel zooming
-        imageContainer.addEventListener('wheel', panzoom.zoomWithWheel);
+        // Variables to store image state
+        var imgWidth, imgHeight, imgTop, imgLeft;
         
-        // --- NEW JAVASCRIPT FOR BUTTONS ---
+        // Variables for dragging
+        var isDragging = false;
+        var startX, startY, startLeft, startTop;
 
-        // 1. Connect Zoom buttons to Panzoom's API
-        zoomInBtn.addEventListener('click', () => panzoom.zoomIn());
-        zoomOutBtn.addEventListener('click', () => panzoom.zoomOut());
-
-        // 2. Connect Fullscreen button to the browser's Fullscreen API
-        fullscreenBtn.addEventListener('click', function() {
-            // Check if we are currently in fullscreen mode
-            if (!document.fullscreenElement) {
-                // If not, request fullscreen on the main container
-                document.documentElement.requestFullscreen()
-                    .then(() => {
-                        fullscreenBtn.textContent = 'Exit';
-                    })
-                    .catch((err) => {
-                        alert(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
-                    });
-            } else {
-                // If we are, exit fullscreen mode
-                document.exitFullscreen()
-                    .then(() => {
-                        fullscreenBtn.textContent = 'Fullscreen';
-                    });
-            }
-        });
+        // This function runs once the image has finished loading
+        img.onload = function() {
+            // Store the image's natural dimensions
+            imgWidth = img.width;
+            imgHeight = img.height;
+            
+            // Center the image for the first time
+            resetImage();
+        };
         
-        // Listen for changes in fullscreen state (e.g., user pressing ESC)
-        document.addEventListener('fullscreenchange', () => {
-            if (!document.fullscreenElement) {
-                fullscreenBtn.textContent = 'Fullscreen';
-            }
-        });
+        // Fallback for if the image is already cached and onload doesn't fire
+        if (img.complete) {
+            img.onload();
+        }
 
-        // Handle image loading errors
-        imageElement.addEventListener('error', function() {
-            alert('Failed to load image. Make sure the Google Drive link is shared with "Anyone with the link".');
-            imageElement.style.display = 'none';
-        });
+        // --- ZOOM FUNCTIONALITY ---
+        function zoom(factor) {
+            // Calculate the new dimensions
+            var newWidth = imgWidth * factor;
+            var newHeight = imgHeight * factor;
+            
+            // Calculate how much the size changed
+            var widthChange = newWidth - imgWidth;
+            var heightChange = newHeight - imgHeight;
+
+            // Adjust the top/left to keep the zoom centered
+            imgTop = imgTop - (heightChange / 2);
+            imgLeft = imgLeft - (widthChange / 2);
+
+            // Update the stored dimensions
+            imgWidth = newWidth;
+            imgHeight = newHeight;
+            
+            // Apply all the new styles to the image
+            updateImageStyle();
+        }
+
+        // --- RESET FUNCTIONALITY ---
+        function resetImage() {
+            // Get the browser window's dimensions
+            var viewWidth = container.offsetWidth;
+            var viewHeight = container.offsetHeight;
+
+            // Calculate the best fit (contain) for the image
+            var ratio = Math.min(viewWidth / img.naturalWidth, viewHeight / img.naturalHeight);
+            
+            imgWidth = img.naturalWidth * ratio;
+            imgHeight = img.naturalHeight * ratio;
+
+            // Center the image
+            imgTop = (viewHeight - imgHeight) / 2;
+            imgLeft = (viewWidth - imgWidth) / 2;
+
+            updateImageStyle();
+        }
+
+        // --- DRAG/PAN FUNCTIONALITY ---
+        img.onmousedown = function(e) {
+            e = e || window.event; // Cross-browser way to get the event object
+            e.preventDefault ? e.preventDefault() : e.returnValue = false; // Prevent default image drag
+
+            isDragging = true;
+            
+            // Record starting positions
+            startX = e.clientX;
+            startY = e.clientY;
+            startLeft = imgLeft;
+            startTop = imgTop;
+
+            // Attach listeners to the whole document
+            document.onmousemove = onDrag;
+            document.onmouseup = onStopDrag;
+        };
+
+        function onDrag(e) {
+            if (!isDragging) return;
+            e = e || window.event;
+
+            // Calculate the distance the mouse has moved
+            var deltaX = e.clientX - startX;
+            var deltaY = e.clientY - startY;
+            
+            // Update the image position
+            imgLeft = startLeft + deltaX;
+            imgTop = startTop + deltaY;
+            
+            updateImageStyle();
+        }
+
+        function onStopDrag() {
+            isDragging = false;
+            // VERY IMPORTANT: Remove the listeners from the document
+            document.onmousemove = null;
+            document.onmouseup = null;
+        }
+        
+        // --- HELPER FUNCTION ---
+        // A single function to apply all style changes to the image
+        function updateImageStyle() {
+            img.style.width = imgWidth + 'px';
+            img.style.height = imgHeight + 'px';
+            img.style.top = imgTop + 'px';
+            img.style.left = imgLeft + 'px';
+        }
+
     </script>
 
 </body>
