@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Full Screen Image Viewer</title>
+    <title>Full Screen Image Viewer with Controls</title>
     <style>
         /* Basic reset to make it full screen */
         html, body {
@@ -11,8 +11,8 @@
             padding: 0;
             height: 100%;
             width: 100%;
-            overflow: hidden; /* Prevents scrollbars on the main page */
-            background-color: #1a1a1a; /* Dark background */
+            overflow: hidden;
+            background-color: #1a1a1a;
             font-family: sans-serif;
         }
 
@@ -25,59 +25,119 @@
             align-items: center;
         }
 
-        /* The image itself, using the correct 'img' tag */
+        /* The image itself */
         #zoomable-image {
             max-width: 100%;
             max-height: 100%;
             cursor: grab;
         }
-
         #zoomable-image:active {
             cursor: grabbing;
         }
         
-        /* Simple instructions overlay */
-        .instructions {
+        /* NEW: Styling for the control buttons */
+        .controls {
             position: absolute;
-            bottom: 10px;
-            left: 50%;
-            transform: translateX(-50%);
+            top: 15px;
+            right: 15px;
+            display: flex;
+            gap: 10px; /* Space between buttons */
+            z-index: 10; /* Ensure buttons are on top */
+        }
+
+        .controls button {
             background-color: rgba(0, 0, 0, 0.6);
             color: white;
-            padding: 8px 15px;
-            border-radius: 20px;
-            font-size: 14px;
-            pointer-events: none;
+            border: none;
+            border-radius: 5px;
+            width: 40px;
+            height: 40px;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .controls button:hover {
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+        
+        /* Specific style for the fullscreen button to fit text */
+        #fullscreen-btn {
+            width: auto;
+            padding: 0 15px;
+            font-size: 16px;
         }
     </style>
 </head>
 <body>
 
     <div id="image-container">
-        <!-- We use the IMG tag with the special 'uc' URL to embed the raw image -->
         <img id="zoomable-image" src="https://drive.google.com/uc?export=view&id=1GgM81MuzsCFAnraxLD66tNDXPsuiJ1Ev" alt="Zoomable Image">
     </div>
     
-    <div class="instructions">
-        Use mouse wheel or pinch to zoom. Drag to pan.
+    <!-- NEW: HTML for the buttons -->
+    <div class="controls">
+        <button id="zoom-in-btn">+</button>
+        <button id="zoom-out-btn">-</button>
+        <button id="fullscreen-btn">Fullscreen</button>
     </div>
 
     <!-- Panzoom library for robust zoom/pan functionality -->
     <script src="https://unpkg.com/@panzoom/panzoom/dist/panzoom.min.js"></script>
 
     <script>
+        // Get elements from the page
         const imageContainer = document.getElementById('image-container');
         const imageElement = document.getElementById('zoomable-image');
+        const zoomInBtn = document.getElementById('zoom-in-btn');
+        const zoomOutBtn = document.getElementById('zoom-out-btn');
+        const fullscreenBtn = document.getElementById('fullscreen-btn');
 
+        // Initialize Panzoom
         const panzoom = Panzoom(imageElement, {
             maxScale: 10,
             minScale: 0.5
         });
 
-        // Enable zooming with the mouse wheel
+        // Still allow mouse wheel zooming
         imageContainer.addEventListener('wheel', panzoom.zoomWithWheel);
         
-        // Handle image loading errors (e.g., permission issues on Google Drive)
+        // --- NEW JAVASCRIPT FOR BUTTONS ---
+
+        // 1. Connect Zoom buttons to Panzoom's API
+        zoomInBtn.addEventListener('click', () => panzoom.zoomIn());
+        zoomOutBtn.addEventListener('click', () => panzoom.zoomOut());
+
+        // 2. Connect Fullscreen button to the browser's Fullscreen API
+        fullscreenBtn.addEventListener('click', function() {
+            // Check if we are currently in fullscreen mode
+            if (!document.fullscreenElement) {
+                // If not, request fullscreen on the main container
+                document.documentElement.requestFullscreen()
+                    .then(() => {
+                        fullscreenBtn.textContent = 'Exit';
+                    })
+                    .catch((err) => {
+                        alert(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+                    });
+            } else {
+                // If we are, exit fullscreen mode
+                document.exitFullscreen()
+                    .then(() => {
+                        fullscreenBtn.textContent = 'Fullscreen';
+                    });
+            }
+        });
+        
+        // Listen for changes in fullscreen state (e.g., user pressing ESC)
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) {
+                fullscreenBtn.textContent = 'Fullscreen';
+            }
+        });
+
+        // Handle image loading errors
         imageElement.addEventListener('error', function() {
             alert('Failed to load image. Make sure the Google Drive link is shared with "Anyone with the link".');
             imageElement.style.display = 'none';
